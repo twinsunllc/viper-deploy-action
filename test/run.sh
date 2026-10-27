@@ -42,7 +42,7 @@ check() {
 # A repository with an origin, checked out at work/, with one commit.
 new_repo() {
   rm -rf "$TMP/origin.git" "$TMP/work"
-  git init -q --bare "$TMP/origin.git"
+  git -c init.defaultBranch=main init -q --bare "$TMP/origin.git"
   git -c init.defaultBranch=main init -q "$TMP/work"
   cd "$TMP/work"
   git config user.email ci@harbor.test
@@ -53,7 +53,7 @@ new_repo() {
 }
 
 c() { git commit -q --allow-empty -m "$1"; }
-push() { git push -q origin "${1:-HEAD:refs/heads/main}" 2>/dev/null; }
+push() { git push -q origin HEAD:refs/heads/main 2>/dev/null; }
 latest() { printf '%s' "$1" > "$STATE/latest"; }
 
 # Runs the action as Actions would, here, and keeps what it printed.
@@ -156,7 +156,7 @@ push; latest "$(git rev-parse HEAD)"
 for n in 401 402 403; do c "Step $n (#$n)"; done
 push
 rm -rf "$TMP/shallow"
-git clone -q --depth 1 "file://$TMP/origin.git" "$TMP/shallow"
+git clone -q --depth 1 --branch main "file://$TMP/origin.git" "$TMP/shallow"
 cd "$TMP/shallow"
 check "the clone starts shallow" "$(git rev-parse --is-shallow-repository)" true
 deploy
