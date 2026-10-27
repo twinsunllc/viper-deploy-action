@@ -16,7 +16,9 @@ passes=0
 python3 "$HERE/server.py" "$STATE" &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null; rm -rf "$TMP"' EXIT
-for _ in $(seq 50); do [[ -s "$STATE/port" ]] && break; sleep 0.1; done
+# A cold Python can take a while to start on a hosted runner.
+for _ in $(seq 300); do [[ -s "$STATE/port" ]] && break; sleep 0.1; done
+[[ -s "$STATE/port" ]] || { echo "the stand-in server didn't start in 30 seconds" >&2; exit 1; }
 URL="http://127.0.0.1:$(cat "$STATE/port")"
 
 # Every program the script runs goes through a shim that logs its arguments, so a test can check

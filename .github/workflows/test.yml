@@ -45,7 +45,7 @@ jobs:
           echo "::add-mask::$token"
           printf '%s' "$token" > "$state/token"
           python3 test/server.py "$state" &
-          for _ in $(seq 50); do [ -s "$state/port" ] && break; sleep 0.1; done
+          for _ in $(seq 300); do [ -s "$state/port" ] && break; sleep 0.1; done
           echo "url=http://127.0.0.1:$(cat "$state/port")" >> "$GITHUB_OUTPUT"
           echo "token=$token" >> "$GITHUB_OUTPUT"
           echo "state=$state" >> "$GITHUB_OUTPUT"
