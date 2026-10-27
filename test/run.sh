@@ -91,6 +91,24 @@ check "a key longer than the block signs as openssl does" \
   "$(sed -n '/^pad_key()/,/^}/p;/^hmac_file()/,/^}/p' "$SCRIPT" > "$TMP/hmac.sh"; VIPER_DEPLOY_TOKEN="$long" WORK="$TMP" bash -c ". '$TMP/hmac.sh'; hmac_file '$TMP/msg'")" \
   "$(printf 'x' | openssl dgst -sha256 -hmac "$long" -r | cut -d' ' -f1)"
 
+echo "== A checkout with no origin"
+new_repo
+git tag build-77
+git remote remove origin
+latest "$(git rev-parse HEAD)"
+c "Merge pull request #12 from twinsunllc/fix/local-run"
+git tag -d build-77 >/dev/null; git tag build-78
+deploy
+check "a local checkout with no origin still deploys" "$status" 0
+check "named from its own tag" "$(body .build)" '"78"'
+check "with its range" "$(prs)" "[12]"
+latest "0000000000000000000000000000000000000000"
+deploy
+check "an unknown last commit with no origin to fetch from still deploys" "$status" 0
+check "and sends HEAD only" "$(body .range_known)" false
+new_repo
+latest ""
+
 echo "== The first run"
 deploy
 check "sends only HEAD" "$(body .commit_shas)" "[\"$(git rev-parse HEAD)\"]"
