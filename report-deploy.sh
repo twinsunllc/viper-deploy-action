@@ -94,6 +94,8 @@ last_commit() {
 # another branch. Fails quietly; the caller checks.
 have_commit() {
   local sha=$1
+  git cat-file -e "$sha^{commit}" 2>/dev/null && return 0
+  git remote get-url origin >/dev/null 2>&1 || return 1
   if [[ "$(git rev-parse --is-shallow-repository)" == true ]]; then
     note "Fetching history (the checkout is shallow)."
     git fetch --quiet --no-tags --unshallow origin 2>/dev/null || git fetch --quiet --no-tags --depth=100000 origin 2>/dev/null || true
@@ -179,9 +181,13 @@ build=${VIPER_BUILD:-}
 if [[ -z "$build" ]]; then
   pattern=${VIPER_BUILD_TAG:-build-*}
   prefix=${pattern%%\**}
-  tags=$( { git tag --points-at HEAD --list "$pattern" 2>/dev/null
-            git ls-remote --tags origin "refs/tags/$pattern" 2>/dev/null |
-              awk -v head="$head_sha" '$1 == head { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2 }'
+  # A checkout with no origin (a local run) has only its own tags; a remote that can't be
+  # reached is never a reason to fail the deploy.
+  tags=$( { git tag --points-at HEAD --list "$pattern" 2>/dev/null || true
+            if git remote get-url origin >/dev/null 2>&1; then
+              { git ls-remote --tags origin "refs/tags/$pattern" 2>/dev/null || true; } |
+                awk -v head="$head_sha" '$1 == head { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2 }'
+            fi
           } | sort -u)
   if [[ -n "$tags" ]]; then
     build=$(echo "$tags" | sed "s|^$prefix||" | sort -V | tail -1)
