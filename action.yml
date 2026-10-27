@@ -1,0 +1,63 @@
+name: Report a deploy to Viper
+description: Tells Viper which build reached an environment, and which pull requests and Jira keys it added and took away.
+author: Twin Sun
+branding:
+  icon: send
+  color: blue
+
+inputs:
+  viper-url:
+    description: Viper's address, like https://viper.twinsunsolutions.com
+    required: true
+  environment-id:
+    description: The environment's ID, from its card in Viper's project settings.
+    required: true
+  token:
+    description: The environment's deploy token. Pass it from a secret, never as text.
+    required: true
+  build:
+    description: The build's name for people. Leave it out to use the highest build-tag tag at HEAD, else the run number.
+    required: false
+    default: ""
+  build-tag:
+    description: The tags that name a build; "build-1041" names it "1041".
+    required: false
+    default: build-*
+  platforms:
+    description: The platforms this deploy reached (ios, android, web), separated by commas. Leave it out for every platform.
+    required: false
+    default: ""
+  deployed-by:
+    description: Who deployed, as a name or an email. Defaults to the actor that ran the workflow.
+    required: false
+    default: ""
+
+outputs:
+  deploy-id:
+    description: The deploy Viper recorded.
+    value: ${{ steps.report.outputs.deploy-id }}
+  build:
+    description: The build's name as Viper recorded it.
+    value: ${{ steps.report.outputs.build }}
+  outcome:
+    description: created, filled (CI filled in a deploy the widget saw first) or duplicate (this run was reported already).
+    value: ${{ steps.report.outputs.outcome }}
+  range-known:
+    description: false on the first run, or when git couldn't walk from the last deployed commit; then the deploy names no fixes.
+    value: ${{ steps.report.outputs.range-known }}
+
+runs:
+  using: composite
+  steps:
+    - id: report
+      shell: bash
+      # Every input goes in by environment, so the token never reaches a command line.
+      env:
+        VIPER_URL: ${{ inputs.viper-url }}
+        VIPER_ENVIRONMENT_ID: ${{ inputs.environment-id }}
+        VIPER_DEPLOY_TOKEN: ${{ inputs.token }}
+        VIPER_BUILD: ${{ inputs.build }}
+        VIPER_BUILD_TAG: ${{ inputs.build-tag }}
+        VIPER_PLATFORMS: ${{ inputs.platforms }}
+        VIPER_DEPLOYED_BY: ${{ inputs.deployed-by }}
+      run: '"$GITHUB_ACTION_PATH/report-deploy.sh"'

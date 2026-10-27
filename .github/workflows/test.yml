@@ -1,0 +1,70 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  script:
+    name: The script (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Which tools the runner has
+        run: bash --version | head -1; git --version; jq --version; openssl version; curl --version | head -1
+      - name: Tests on the runner's bash
+        run: bash test/run.sh
+      - name: Tests on /bin/bash
+        run: /bin/bash test/run.sh
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: shellcheck -s bash report-deploy.sh test/run.sh
+
+  # The action itself, as a workflow uses it, against the stand-in server.
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Start the stand-in for Viper
+        id: viper
+        run: |
+          state="$RUNNER_TEMP/viper"
+          mkdir -p "$state"
+          token="vdt_$(openssl rand -hex 24)"
+          echo "::add-mask::$token"
+          printf '%s' "$token" > "$state/token"
+          python3 test/server.py "$state" &
+          for _ in $(seq 300); do [ -s "$state/port" ] && break; sleep 0.1; done
+          echo "url=http://127.0.0.1:$(cat "$state/port")" >> "$GITHUB_OUTPUT"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+      - name: Report the deploy
+        id: report
+        uses: ./
+        with:
+          viper-url: ${{ steps.viper.outputs.url }}
+          environment-id: env-1
+          token: ${{ steps.viper.outputs.token }}
+          platforms: ios, android
+      - name: Check what Viper got
+        env:
+          STATE: ${{ steps.viper.outputs.state }}
+        run: |
+          jq . "$STATE/body.json"
+          test "$(jq -r .commit_sha "$STATE/body.json")" = "$(git rev-parse HEAD)"
+          test "$(jq -r .range_known "$STATE/body.json")" = false
+          test "$(jq -c .platforms "$STATE/body.json")" = '["android","ios"]'
+          test "$(jq -r '."X-Viper-Delivery"' "$STATE/headers.json")" = "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-action"
+          test "${{ steps.report.outputs.deploy-id }}" = deploy-1
+          test "${{ steps.report.outputs.range-known }}" = false
