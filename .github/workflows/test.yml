@@ -26,14 +26,14 @@ jobs:
         run: /bin/bash test/run.sh
 
   shellcheck:
-    runs-on: ubuntu-latest
+    runs-on: [runs-on,runner=2cpu-linux-x64,image=ubuntu24-full-x64,"run-id=${{ github.run_id }}"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: shellcheck -s bash report-deploy.sh test/run.sh
 
   # The action itself, as a workflow uses it, against the stand-in server.
   action:
-    runs-on: ubuntu-latest
+    runs-on: [runs-on,runner=2cpu-linux-x64,image=ubuntu24-full-x64,"run-id=${{ github.run_id }}"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start the stand-in for Viper
